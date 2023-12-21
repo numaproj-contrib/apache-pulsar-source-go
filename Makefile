@@ -1,10 +1,10 @@
 SHELL:=/bin/bash
 TARGET_ARCH?=amd64
 
-PACKAGE=github.com/numaproj-contrib/gcp-pub-sub-source-go
+PACKAGE=github.com/numaproj-contrib/apache-pulsar-source-go
 CURRENT_DIR=$(shell pwd)
 DIST_DIR=${CURRENT_DIR}/dist
-BINARY_NAME:=gcp-pubsub-source-go
+BINARY_NAME:=apache-pulsar-source-go
 IMAGE_NAMESPACE?=quay.io/numaproj
 VERSION?=latest
 
@@ -54,7 +54,7 @@ build: clean
 	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -o ./dist/gcloud-pubsub-source-arm64 main.go
 
 image: build
-	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/gcloud-pubsub-source:$(IMAGE_TAG)" --platform $(PLATFORMS) --target $(TARGET) . --load
+	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source:$(IMAGE_TAG)" --platform $(PLATFORMS) --target $(TARGET) . --load
 
 lint:
 	go mod tidy
@@ -65,7 +65,7 @@ test:
 	@go test -race ./pkg/pubsubsource -run TestPubSubSource_Read
 
 imagepush: build
-	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/gcloud-pubsub-source:$(IMAGE_TAG)" --platform $(MULTIPLE_PLATFORMS) --target $(TARGET) . --push
+	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source:$(IMAGE_TAG)" --platform $(MULTIPLE_PLATFORMS) --target $(TARGET) . --push
 
 dist/e2eapi:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -ldflags '${LDFLAGS}' -o ${DIST_DIR}/e2eapi ./test/e2e-api
