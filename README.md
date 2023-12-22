@@ -1,4 +1,3 @@
-```markdown
 # Apache Pulsar Source for Numaflow
 
 This document details the setup of an Apache Pulsar source within a [Numaflow](https://numaflow.numaproj.io/) pipeline. The integration of Apache Pulsar as a source allows for the efficient ingestion of data from Apache Pulsar topics into a Numaflow pipeline for further processing and routing to various sinks like Redis.
@@ -77,8 +76,5 @@ kubectl delete -f pulsar-source-pipeline.yaml
 - For detailed guidance on Numaflow, visit the [Numaflow Documentation](https://numaflow.numaproj.io/).
 - To learn more about Apache Pulsar and its configuration, refer to the [Apache Pulsar Documentation](https://pulsar.apache.org/docs/en/).
 - For Redis sink configuration, see the [Numaflow Redis Sink Documentation](https://numaflow.numaproj.io/sinks/redis/).
-```
-
----
 
 This README provides a guide on setting up an Apache Pulsar source within a Numaflow pipeline, detailing prerequisites, a step-by-step setup guide, and additional resources. Remember to replace placeholders like `test-topic`, `test-subscription`, and Pulsar host details with actual values from your Apache Pulsar setup.
