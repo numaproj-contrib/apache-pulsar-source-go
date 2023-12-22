@@ -1,7 +1,7 @@
 apiVersion: numaflow.numaproj.io/v1alpha1
 kind: Pipeline
 metadata:
-  name: aws-sqs-source
+  name: apache-pulsar-source
 spec:
   limits:
     readBatchSize: 10 # for aws sqs the batch size should be between 1 -  10 - SQS Valid values: 1 to 10. Default: 1
@@ -10,18 +10,16 @@ spec:
       source:
         udsource:
           container:
-            image: "quay.io/numaio/numaflow-go/aws-sqs-source-go:latest"
+            image: "quay.io/numaio/numaflow-go/apache-pulsar-source-go:latest"
             env:
-              - name: AWS_SQS_QUEUE_NAME
-                value: "testing"
-              - name: AWS_REGION
-                value: "us-east-1"
-              - name: AWS_ACCESS_KEY_ID
-                value: "testing"
-              - name: AWS_SECRET_ACCESS_KEY
-                value: "testing"
-              - name: AWS_ENDPOINT_URL
-                value: "http://moto.numaflow-system.svc.cluster.local:5000"
+              - name: PULSAR_TOPIC
+                value: "test-topic"
+              - name: PULSAR_SUBSCRIPTION_NAME
+                value: "test-subscription"
+              - name: PULSAR_HOST
+                value: "pulsar-broker.numaflow-system.svc.cluster.local:6650"
+              - name: PULSAR_ADMIN_ENDPOINT
+                value: "http://pulsar-broker.numaflow-system.svc.cluster.local:8080"
     - name: redis-sink
       sink:
         udsink:

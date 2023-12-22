@@ -20,7 +20,7 @@ BASE_VERSION:=latest
 DOCKERIO_ORG=quay.io/numaio
 PLATFORMS=linux/x86_64
 MULTIPLE_PLATFORMS=linux/x86_64,linux/arm64,linux/amd64
-TARGET=gcloud-pubsub-source
+TARGET=apache-pulsar-source-go
 
 
 ifneq (${GIT_TAG},)
@@ -50,11 +50,11 @@ endif
 .PHONY: build image lint clean test imagepush install-numaflow
 
 build: clean
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o ./dist/gcloud-pubsub-source-amd64 main.go
-	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -o ./dist/gcloud-pubsub-source-arm64 main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -o ./dist/apache-pulsar-source-go-amd64 main.go
+	CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -v -o ./dist/apache-pulsar-source-go-arm64 main.go
 
 image: build
-	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source:$(IMAGE_TAG)" --platform $(PLATFORMS) --target $(TARGET) . --load
+	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source-go:$(IMAGE_TAG)" --platform $(PLATFORMS) --target $(TARGET) . --load
 
 lint:
 	go mod tidy
@@ -65,7 +65,7 @@ test:
 	@go test -race ./pkg/pubsubsource -run TestPubSubSource_Read
 
 imagepush: build
-	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source:$(IMAGE_TAG)" --platform $(MULTIPLE_PLATFORMS) --target $(TARGET) . --push
+	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source-go:$(IMAGE_TAG)" --platform $(MULTIPLE_PLATFORMS) --target $(TARGET) . --push
 
 dist/e2eapi:
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -v -ldflags '${LDFLAGS}' -o ${DIST_DIR}/e2eapi ./test/e2e-api
@@ -87,7 +87,7 @@ test-e2e:
 	kubectl -n numaflow-system delete po e2e-api-pod  --ignore-not-found=true
 	cat test/manifests/e2e-api-pod.yaml |  sed 's@quay.io/numaio/numaflow-go/@$(IMAGE_NAMESPACE)/@' | sed 's/:latest/:$(VERSION)/' | kubectl -n numaflow-system apply -f -
 	go generate $(shell find ./pkg/e2e/test$* -name '*.go')
-	go test -v -timeout 15m -count 1 --tags test -p 1 ./test/pubsub/pubsub_e2e_test.go
+	go test -v -timeout 15m -count 1 --tags test -p 1 ./test/apachepulsar/apachepulsar_e2e_test.go
 	$(MAKE) cleanup-e2e
 
 .PHONY: e2eapi-image

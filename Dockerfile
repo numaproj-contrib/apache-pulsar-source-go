@@ -8,17 +8,17 @@ RUN apk update && apk upgrade && \
     apk add ca-certificates && \
     apk --no-cache add tzdata
 
-COPY dist/gcloud-pubsub-source-${ARCH} /bin/gcloud-pubsub-source
-RUN chmod +x /bin/gcloud-pubsub-source
+COPY dist/apache-pulsar-source-go-${ARCH} /bin/apache-pulsar-source-go
+RUN chmod +x /bin/apache-pulsar-source-go
 
 ####################################################################################################
-# gcloud-pubsub-source
+# apache-pulsar-source-go
 ####################################################################################################
-FROM scratch as gcloud-pubsub-source
+FROM scratch as apache-pulsar-source-go
 ARG ARCH
 COPY --from=base /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
-COPY --from=base /bin/gcloud-pubsub-source /bin/gcloud-pubsub-source
+COPY --from=base /bin/apache-pulsar-source-go /bin/apache-pulsar-source-go
 ENTRYPOINT [ "/bin/gcloud-pubsub-source" ]
 
 ####################################################################################################

@@ -1,5 +1,3 @@
-//go:build test
-
 /*
    Copyright 2022 The Numaproj Authors.
 
@@ -16,73 +14,56 @@
    limitations under the License.
 */
 
-package sqs
+package apachepulsar
 
 import (
 	"context"
 	"fmt"
 	"log"
-	"os"
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/sqs"
+	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/numaproj-contrib/numaflow-utils-go/testing/fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
-type SqsSourceSuite struct {
+const (
+	host             = "pulsar://localhost:6650"
+	topic            = "test-topic"
+	subscriptionName = "test-subscription"
+)
+
+type ApachePulsarSuite struct {
 	fixtures.E2ESuite
 }
 
-const (
-	queueName = "testing"
-)
-
-func setupQueue(client *sqs.Client, queueName string, ctx context.Context) (*string, error) {
-	params := &sqs.CreateQueueInput{
-		QueueName: aws.String(queueName),
-	}
-	response, err := client.CreateQueue(ctx, params)
-	if err != nil {
-		fmt.Println("Error creating queue:", err)
-		return nil, err
-	}
-	return response.QueueUrl, nil
-}
-
-func initClient(ctx context.Context) (*sqs.Client, error) {
-	// Load default configs for aws based on env variable provided based on
-	// https://aws.github.io/aws-sdk-go-v2/docs/configuring-sdk/#specifying-credentials
-	cfg, err := config.LoadDefaultConfig(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("failed loading aws config, err: %v", err)
-	}
-	client := sqs.NewFromConfig(cfg, func(options *sqs.Options) {
-		options.BaseEndpoint = aws.String(os.Getenv("AWS_ENDPOINT_URL"))
+func sendMessage(client pulsar.Client, ctx context.Context) error {
+	producer, err := client.CreateProducer(pulsar.ProducerOptions{
+		Topic: topic,
 	})
-	return client, nil
-}
-
-func sendMessages(client *sqs.Client, queueURL *string, testMessage string, ctx context.Context) error {
-	// Check if queueURL is not nil and not an empty string
-	if queueURL == nil || *queueURL == "" {
-		return fmt.Errorf("invalid queue URL: %v", queueURL)
-	}
-	sendParams := &sqs.SendMessageInput{
-		QueueUrl:    queueURL, // Ensure QueueUrl is set correctly here
-		MessageBody: aws.String(testMessage),
-	}
-	_, err := client.SendMessage(ctx, sendParams)
 	if err != nil {
 		return err
 	}
-	return nil
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		default:
+			_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
+				Payload: []byte("hello"),
+			})
+			defer producer.Close()
+			if err != nil {
+				fmt.Println("Failed to publish message", err)
+			}
+			fmt.Println("Published message")
+		}
+	}
 }
-func (suite *SqsSourceSuite) SetupTest() {
+
+func (suite *ApachePulsarSuite) SetupTest() {
 
 	suite.T().Log("e2e Api resources are ready")
 	suite.StartPortForward("e2e-api-pod", 8378)
@@ -95,42 +76,50 @@ func (suite *SqsSourceSuite) SetupTest() {
 
 	suite.T().Log("Redis resources are ready")
 
-	// Create Moto resources used for mocking AWS APIs.
-	motoDeleteCmd := fmt.Sprintf("kubectl delete -k ../../config/apps/moto -n %s --ignore-not-found=true", fixtures.Namespace)
-	suite.Given().When().Exec("sh", []string{"-c", motoDeleteCmd}, fixtures.OutputRegexp(""))
-	motoCreateCmd := fmt.Sprintf("kubectl apply -k ../../config/apps/moto -n %s", fixtures.Namespace)
-	suite.Given().When().Exec("sh", []string{"-c", motoCreateCmd}, fixtures.OutputRegexp("service/moto created"))
-	motoLabelSelector := fmt.Sprintf("app=%s", "moto")
-	suite.Given().When().WaitForStatefulSetReady(motoLabelSelector)
-	suite.Given().When().WaitForPodReady("moto-0", motoLabelSelector)
-	suite.T().Log("Moto resources are ready")
-	suite.T().Log("port forwarding moto service")
-	suite.StartPortForward("moto-0", 5000)
+	// Create Pulsar resources used for mocking AWS APIs.
+	apachePulsarDeleteCmd := fmt.Sprintf("kubectl delete -k ../../config/apps/apachepulsar -n %s --ignore-not-found=true", fixtures.Namespace)
+	suite.Given().When().Exec("sh", []string{"-c", apachePulsarDeleteCmd}, fixtures.OutputRegexp(""))
+	apachePulsarCreateCmd := fmt.Sprintf("kubectl apply -k ../../config/apps/apachepulsar -n %s", fixtures.Namespace)
+	suite.Given().When().Exec("sh", []string{"-c", apachePulsarCreateCmd}, fixtures.OutputRegexp("service/pulsar-broker created"))
+	pulsarLabelSelector := fmt.Sprintf("app=%s", "pulsar-broker")
+	//suite.Given().When().WaitForStatefulSetReady(pulsarLabelSelector)
+	suite.Given().When().WaitForPodReady("pulsar-broker-0", pulsarLabelSelector)
+	suite.T().Log("apache pulsar resources are ready")
+	suite.T().Log("port forwarding apache pulsar service")
+	suite.StartPortForward("pulsar-broker-0", 6650)
 }
 
-func (suite *SqsSourceSuite) TestSqsSource() {
-	var testMessage = "aws_Sqs"
+func initClient() (pulsar.Client, error) {
+	pulsarClient, err := pulsar.NewClient(pulsar.ClientOptions{
+		URL:               host,
+		OperationTimeout:  30 * time.Second,
+		ConnectionTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return pulsarClient, nil
+}
+func (suite *ApachePulsarSuite) TestApachePulsarSource() {
+	var testMessage = "testing"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	client, err := initClient(ctx)
+	client, err := initClient()
 	assert.Nil(suite.T(), err)
-	// Create SQS client
-	queueURL, err := setupQueue(client, queueName, ctx)
-	assert.Nil(suite.T(), err)
-
 	stopChan := make(chan struct{})
-	workflow := suite.Given().Pipeline("@testdata/sqs_source.yaml").When().CreatePipelineAndWait()
+	workflow := suite.Given().Pipeline("@testdata/apachepulsar_source.yaml").When().CreatePipelineAndWait()
 	workflow.Expect().VertexPodsRunning()
 
 	go func() {
 		for {
-			sendErr := sendMessages(client, queueURL, testMessage, ctx)
+			sendErr := sendMessage(client, ctx)
 			if sendErr != nil {
 				log.Fatalf("Error in Sending Message: %s", sendErr)
 			}
 			select {
 			case <-stopChan:
-				log.Println("Stopped sending messages to queue.")
+				log.Println("Stopped sending messages to pulsar subscriber.")
 				return
 			default:
 				// Continue sending messages at a specific interval, if needed
@@ -144,6 +133,6 @@ func (suite *SqsSourceSuite) TestSqsSource() {
 	stopChan <- struct{}{}
 }
 
-func TestSqsSourceSuite(t *testing.T) {
-	suite.Run(t, new(SqsSourceSuite))
+func TestApachePulsarSourceSuite(t *testing.T) {
+	suite.Run(t, new(ApachePulsarSuite))
 }
