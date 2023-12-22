@@ -53,7 +53,6 @@ func sendMessage(client pulsar.Client, ctx context.Context) {
 		log.Fatal(err)
 	}
 	defer producer.Close()
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -63,9 +62,8 @@ func sendMessage(client pulsar.Client, ctx context.Context) {
 				Payload: []byte("hello"),
 			})
 			if err != nil {
-				fmt.Println("Failed to publish message", err)
+				log.Println("Failed to publish message", err)
 			}
-			fmt.Println("Published message")
 		}
 	}
 }
@@ -98,7 +96,6 @@ func TestMain(m *testing.M) {
 		_ = pool.Purge(resource)
 		log.Fatalf("could not start resource %s", err)
 	}
-
 	if err != nil {
 		log.Fatalf("error -%s", err)
 	}
@@ -148,7 +145,6 @@ func TestPulsarSource_Read(t *testing.T) {
 		Timeout:    20 * time.Second,
 	}, messageCh)
 	assert.Equal(t, 5, len(messageCh))
-
 	// Try reading 4 more messages
 	// Since the previous batch didn't get acked, the data source shouldn't allow us to read more messages
 	// We should get 0 messages, meaning the channel only holds the previous 5 messages
