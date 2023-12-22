@@ -52,6 +52,8 @@ func sendMessage(client pulsar.Client, ctx context.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
+	defer producer.Close()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -60,7 +62,6 @@ func sendMessage(client pulsar.Client, ctx context.Context) {
 			_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
 				Payload: []byte("hello"),
 			})
-			defer producer.Close()
 			if err != nil {
 				fmt.Println("Failed to publish message", err)
 			}

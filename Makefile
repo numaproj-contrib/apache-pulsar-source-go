@@ -62,7 +62,7 @@ lint:
 
 test:
 	@echo "Running integration tests..."
-	@go test -race ./pkg/pubsubsource -run TestPubSubSource_Read
+	@go test -race ./pkg/apachepulsar
 
 imagepush: build
 	docker buildx build --no-cache -t "$(DOCKERIO_ORG)/numaflow-go/apache-pulsar-source-go:$(IMAGE_TAG)" --platform $(MULTIPLE_PLATFORMS) --target $(TARGET) . --push

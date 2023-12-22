@@ -30,35 +30,35 @@ import (
 )
 
 const (
-	host             = "pulsar://localhost:6650"
-	topic            = "test-topic"
-	subscriptionName = "test-subscription"
+	host  = "pulsar://localhost:6650"
+	topic = "test-topic"
 )
 
 type ApachePulsarSuite struct {
 	fixtures.E2ESuite
 }
 
-func sendMessage(client pulsar.Client, ctx context.Context) error {
+func sendMessage(client pulsar.Client, ctx context.Context) {
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
 	})
 	if err != nil {
-		return err
+		log.Fatalf("error creating the producer %s", err)
 	}
+	defer producer.Close()
+
 	for {
 		select {
 		case <-ctx.Done():
-			return nil
+			return
 		default:
 			_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
-				Payload: []byte("hello"),
+				Payload: []byte("testing"),
 			})
-			defer producer.Close()
 			if err != nil {
 				fmt.Println("Failed to publish message", err)
 			}
-			fmt.Println("Published message")
+			time.Sleep(5 * time.Second)
 		}
 	}
 }
@@ -107,30 +107,11 @@ func (suite *ApachePulsarSuite) TestApachePulsarSource() {
 	defer cancel()
 	client, err := initClient()
 	assert.Nil(suite.T(), err)
-	stopChan := make(chan struct{})
 	workflow := suite.Given().Pipeline("@testdata/apachepulsar_source.yaml").When().CreatePipelineAndWait()
 	workflow.Expect().VertexPodsRunning()
-
-	go func() {
-		for {
-			sendErr := sendMessage(client, ctx)
-			if sendErr != nil {
-				log.Fatalf("Error in Sending Message: %s", sendErr)
-			}
-			select {
-			case <-stopChan:
-				log.Println("Stopped sending messages to pulsar subscriber.")
-				return
-			default:
-				// Continue sending messages at a specific interval, if needed
-				time.Sleep(1 * time.Second)
-			}
-		}
-	}()
-	assert.Nil(suite.T(), err)
+	go sendMessage(client, ctx)
 	defer workflow.DeletePipelineAndWait()
 	workflow.Expect().SinkContains("redis-sink", testMessage, fixtures.WithTimeout(2*time.Minute))
-	stopChan <- struct{}{}
 }
 
 func TestApachePulsarSourceSuite(t *testing.T) {

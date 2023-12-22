@@ -19,7 +19,7 @@ ARG ARCH
 COPY --from=base /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=base /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=base /bin/apache-pulsar-source-go /bin/apache-pulsar-source-go
-ENTRYPOINT [ "/bin/gcloud-pubsub-source" ]
+ENTRYPOINT [ "/bin/apache-pulsar-source-go" ]
 
 ####################################################################################################
 # testbase
