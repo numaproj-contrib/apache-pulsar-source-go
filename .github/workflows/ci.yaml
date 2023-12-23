@@ -47,16 +47,24 @@ jobs:
       - name: "Step 5: Run Lint"
         run: make lint
 
-
-
       - name: "Step 6: Ensure Pulsar is Ready"
-        run: | 
-              echo "Checking Pulsar readiness..."
-              until curl -s http://localhost:8080; do
-              echo "Waiting for Pulsar to be ready..."
+        run: |
+            echo "Checking Pulsar readiness..."
+            for i in {1..24}; do # 2 minutes with 5-second intervals
+              response=$(curl -s http://localhost:8080 || true) # Prevent script from stopping on curl error
+              if [[ -n $response ]]; then
+                echo "Pulsar is ready."
+                echo "Response: $response"
+                break
+              fi
+              echo "Waiting for Pulsar to be ready... Attempt $i"
+              echo "Response was: $response"
               sleep 5
-              done
-              echo "Pulsar is ready."
+            done
+            if [ $i -eq 24 ]; then
+              echo "Pulsar did not become ready in time"
+              exit 1
+            fi
 
       - name: "Step 7 : Create Necessary topic"
         run: |
