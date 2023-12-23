@@ -12,15 +12,6 @@ jobs:
   build:
     name: apachepulsar-source-go
     runs-on: ubuntu-latest
-    services:
-      apachepulsar:
-        image: apachepulsar/pulsar:latest
-        ports:
-          - 6650:6650
-          - 8080:8080
-        options: >-
-          --mount type=bind,source=$(pwd)/pulsardata,target=/pulsar/data
-          --mount type=bind,source=$(pwd)/pulsarconf,target=/pulsar/conf
     timeout-minutes: 10
     env:
       GOPATH: /home/runner/go
@@ -52,11 +43,12 @@ jobs:
 
 
 
-      - name: "Step 6 : Create Necessary topic"
-        run: |
-              echo "Creating topics..."
-              curl -s -X PUT $PULSAR_ADMIN/persistent/public/default/test-topic/partitions -d 2
-              echo "Topics created."
+      - name: "Step 6 : Setup Apache Pulsar"
+        uses: reugn/github-action-pulsar@v1
+        with:
+          version: 'latest'
+          brokerServicePort: '6650'
+          httpServerPort: '8080'
 
       - name: "Step 7: Run unit Tests"
         run: make test
