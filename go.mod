@@ -1,4 +1,4 @@
-module github.com/shubhamdixit863/apache-pulsar-source-go
+module github.com/numaproj-contrib/apache-pulsar-source-go
 
 go 1.21.3
 

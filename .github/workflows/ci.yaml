@@ -41,8 +41,6 @@ jobs:
       - name: "Step 5: Run Lint"
         run: make lint
 
-
-
       - name: "Step 6 : Setup Apache Pulsar"
         uses: reugn/github-action-pulsar@v1
         with:

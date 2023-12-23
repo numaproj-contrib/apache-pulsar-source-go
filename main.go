@@ -26,7 +26,7 @@ import (
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/numaproj/numaflow-go/pkg/sourcer"
 
-	"github.com/shubhamdixit863/apache-pulsar-source-go/pkg/apachepulsar"
+	"github.com/numaproj-contrib/apache-pulsar-source-go/pkg/apachepulsar"
 )
 
 func main() {

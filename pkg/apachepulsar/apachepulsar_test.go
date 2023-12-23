@@ -30,7 +30,7 @@ import (
 	"github.com/ory/dockertest/v3/docker"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/shubhamdixit863/apache-pulsar-source-go/pkg/mocks"
+	"github.com/numaproj-contrib/apache-pulsar-source-go/pkg/mocks"
 )
 
 var (
