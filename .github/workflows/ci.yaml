@@ -21,7 +21,6 @@ jobs:
         options: >-
           --mount type=bind,source=$(pwd)/pulsardata,target=/pulsar/data
           --mount type=bind,source=$(pwd)/pulsarconf,target=/pulsar/conf
-            command: ["bin/pulsar", "standalone"]
     timeout-minutes: 10
     env:
       GOPATH: /home/runner/go
