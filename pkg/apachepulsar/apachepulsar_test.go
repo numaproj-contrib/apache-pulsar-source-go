@@ -45,13 +45,21 @@ const (
 	subscriptionName = "test-subscription"
 )
 
-func initProducer(client pulsar.Client) (pulsar.Producer, error) {
+func initProducer(client pulsar.Client, ctx context.Context) (pulsar.Producer, error) {
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
 	})
 	if err != nil {
 		return nil, err
 	}
+	// Check to make sure that topic gets created in the test
+	_, err = producer.Send(ctx, &pulsar.ProducerMessage{
+		Payload: []byte("hello"),
+	})
+	if err != nil {
+		return nil, err
+	}
+
 	return producer, err
 }
 
