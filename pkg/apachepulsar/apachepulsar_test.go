@@ -45,7 +45,7 @@ const (
 	subscriptionName = "testSubscription"
 )
 
-func initProducer(client pulsar.Client, ctx context.Context) (pulsar.Producer, error) {
+func initProducer(client pulsar.Client) (pulsar.Producer, error) {
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
 	})
@@ -132,7 +132,7 @@ func TestPulsarSource_Read(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	log.Println("pulsar client", pulsarClient)
-	producer, err := initProducer(pulsarClient, ctx)
+	producer, err := initProducer(pulsarClient)
 	assert.Nil(t, err)
 	defer producer.Close()
 	go sendMessage(producer, ctx)
@@ -203,7 +203,7 @@ func TestPulsarSource_Partitions(t *testing.T) {
 func TestPulsarSource_Pending(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	producer, err := initProducer(pulsarClient, ctx)
+	producer, err := initProducer(pulsarClient)
 	assert.Nil(t, err)
 	defer producer.Close()
 	go sendMessage(producer, ctx)

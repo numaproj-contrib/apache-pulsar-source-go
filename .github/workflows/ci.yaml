@@ -48,18 +48,18 @@ jobs:
           brokerServicePort: '6650'
           httpServerPort: '8080'
 
-      - name: "Step 6.1: Delay for service to be ready"
-        run: sleep 50
+      - name: "Step 7: Delay for Pulsar  service to be ready"
+        run: sleep 30
 
-      - name: "Step 7: Run unit Tests"
+      - name: "Step 8: Run unit Tests"
         run: make test
 
-      - name: "Step 8: Build and create docker image"
+      - name: "Step 9: Build and create docker image"
         run: make image
         env:
           TAG: ${{ env.IMAGE_TAG }}
 
-      - name: "Step 9: Docker Login"
+      - name: "Step 10: Docker Login"
         if: startsWith(github.ref, 'refs/tags/v')
         uses: docker/login-action@v2
         with:
@@ -67,16 +67,16 @@ jobs:
           username: ${{ secrets.QUAYIO_USERNAME }}
           password: ${{ secrets.QUAYIO_PASSWORD }}
 
-      - name: "Step 10: Build docker image"
+      - name: "Step 11: Build docker image"
         if: startsWith(github.ref, 'refs/tags/v')
         run: docker push "quay.io/numaio/numaflow-go/apache-pulsar-source-go:${{env.IMAGE_TAG}}"
 
-      - name: "Step 11: Store docker image"
+      - name: "Step 12: Store docker image"
         run: |
           docker tag "quay.io/numaio/numaflow-go/apache-pulsar-source-go:${{env.IMAGE_TAG}}" "quay.io/numaio/numaflow-go/apache-pulsar-source-go:pulsar-source-go"
           docker save -o /tmp/apache-pulsar-source-go-image.tar "quay.io/numaio/numaflow-go/apache-pulsar-source-go:pulsar-source-go"
 
-      - name: "Step 12: Upload docker artifact"
+      - name: "Step 13: Upload docker artifact"
         uses: actions/upload-artifact@v3
         with:
           name: pulsar-source-go
