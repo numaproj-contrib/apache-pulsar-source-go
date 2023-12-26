@@ -44,9 +44,12 @@ jobs:
       - name: "Step 6 : Setup Apache Pulsar"
         uses: reugn/github-action-pulsar@v1
         with:
-          version: 'latest'
+          version: '3.1.1'
           brokerServicePort: '6650'
           httpServerPort: '8080'
+
+      - name: "Step 6.1: Delay for service to be ready"
+        run: sleep 50
 
       - name: "Step 7: Run unit Tests"
         run: make test
