@@ -52,14 +52,6 @@ func initProducer(client pulsar.Client, ctx context.Context) (pulsar.Producer, e
 	if err != nil {
 		return nil, err
 	}
-	// Check to make sure that topic gets created in the test
-	_, err = producer.Send(ctx, &pulsar.ProducerMessage{
-		Payload: []byte("hello"),
-	})
-	if err != nil {
-		return nil, err
-	}
-
 	return producer, err
 }
 
@@ -139,6 +131,7 @@ func TestMain(m *testing.M) {
 func TestPulsarSource_Read(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
+	log.Println("pulsar client", pulsarClient)
 	producer, err := initProducer(pulsarClient, ctx)
 	assert.Nil(t, err)
 	defer producer.Close()
