@@ -41,8 +41,8 @@ var (
 
 const (
 	host             = "pulsar://localhost:6650"
-	topic            = "test-topic"
-	subscriptionName = "test-subscription"
+	topic            = "testTopic"
+	subscriptionName = "testSubscription"
 )
 
 func initProducer(client pulsar.Client, ctx context.Context) (pulsar.Producer, error) {
