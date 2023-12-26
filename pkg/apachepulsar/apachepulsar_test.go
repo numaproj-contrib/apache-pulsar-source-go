@@ -45,20 +45,23 @@ const (
 	subscriptionName = "test-subscription"
 )
 
-func sendMessage(client pulsar.Client, ctx context.Context) {
+func initProducer(client pulsar.Client) (pulsar.Producer, error) {
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
 	})
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
-	defer producer.Close()
+	return producer, err
+}
+
+func sendMessage(producer pulsar.Producer, ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			_, err = producer.Send(context.Background(), &pulsar.ProducerMessage{
+			_, err := producer.Send(ctx, &pulsar.ProducerMessage{
 				Payload: []byte("hello"),
 			})
 			if err != nil {
@@ -128,7 +131,10 @@ func TestMain(m *testing.M) {
 func TestPulsarSource_Read(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go sendMessage(pulsarClient, ctx)
+	producer, err := initProducer(pulsarClient)
+	assert.Nil(t, err)
+	defer producer.Close()
+	go sendMessage(producer, ctx)
 	messageCh := make(chan sourcer.Message, 20)
 	consumer, err := pulsarClient.Subscribe(pulsar.ConsumerOptions{
 		Topic:            topic,
@@ -196,7 +202,10 @@ func TestPulsarSource_Partitions(t *testing.T) {
 func TestPulsarSource_Pending(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	go sendMessage(pulsarClient, ctx)
+	producer, err := initProducer(pulsarClient)
+	assert.Nil(t, err)
+	defer producer.Close()
+	go sendMessage(producer, ctx)
 	messageCh := make(chan sourcer.Message, 20)
 	consumer, err := pulsarClient.Subscribe(pulsar.ConsumerOptions{
 		Topic:            topic,
