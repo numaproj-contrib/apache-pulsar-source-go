@@ -139,7 +139,7 @@ func TestMain(m *testing.M) {
 func TestPulsarSource_Read(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	producer, err := initProducer(pulsarClient)
+	producer, err := initProducer(pulsarClient, ctx)
 	assert.Nil(t, err)
 	defer producer.Close()
 	go sendMessage(producer, ctx)
@@ -210,7 +210,7 @@ func TestPulsarSource_Partitions(t *testing.T) {
 func TestPulsarSource_Pending(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	producer, err := initProducer(pulsarClient)
+	producer, err := initProducer(pulsarClient, ctx)
 	assert.Nil(t, err)
 	defer producer.Close()
 	go sendMessage(producer, ctx)
