@@ -112,5 +112,9 @@ func (ps *PulsarSource) Partitions(ctx context.Context) []int32 {
 		log.Printf("error getting partitions from admin endpoint %s", err)
 		return sourcesdk.DefaultPartitions()
 	}
-	return []int32{int32(stats.Partitions)}
+	var partitions []int32
+	for i := 0; i < stats.Partitions; i++ {
+		partitions = append(partitions, int32(i))
+	}
+	return partitions
 }

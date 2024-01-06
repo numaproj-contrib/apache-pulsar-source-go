@@ -281,7 +281,10 @@ func TestPulsarSource_Partitions(t *testing.T) {
 	defer consumer.Close()
 	pulsarSource := NewPulsarSource(pulsarClient, pulsarAdmin, consumer)
 	partitionsCount := pulsarSource.Partitions(ctx)
-	assert.Equal(t, partitions, int(partitionsCount[0]))
+	assert.Equal(t, partitions, len(partitionsCount))
+	for i, v := range partitionsCount {
+		assert.Equal(t, i, int(v))
+	}
 }
 
 func TestPulsarSource_Pending(t *testing.T) {
