@@ -25,6 +25,7 @@ import (
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	"github.com/numaproj/numaflow-go/pkg/sourcer"
+	pulsaradmin "github.com/streamnative/pulsar-admin-go"
 
 	"github.com/numaproj-contrib/apache-pulsar-source-go/pkg/apachepulsar"
 )
@@ -33,6 +34,9 @@ func main() {
 	topic := os.Getenv("PULSAR_TOPIC")
 	subscriptionName := os.Getenv("PULSAR_SUBSCRIPTION_NAME")
 	host := os.Getenv("PULSAR_HOST")
+	tenant := os.Getenv("PULSAR_TENANT")
+	nameSpace := os.Getenv("PULSAR_NAMESPACE")
+	pulsarAdminEndPoint := os.Getenv("PULSAR_ADMIN_ENDPOINT")
 
 	client, err := pulsar.NewClient(pulsar.ClientOptions{
 		URL:               fmt.Sprintf("pulsar://%s", host),
@@ -43,8 +47,17 @@ func main() {
 		log.Fatalf("could not instantiate Pulsar client: %v", err)
 	}
 	defer client.Close()
+
+	cfg := &pulsaradmin.Config{
+		WebServiceURL: pulsarAdminEndPoint,
+	}
+	pulsarAdminClient, err := pulsaradmin.NewClient(cfg)
+	if err != nil {
+		log.Fatalf("could not instantiate pulsar admin client: %v", err)
+	}
+
 	consumer, err := client.Subscribe(pulsar.ConsumerOptions{
-		Topic:            topic,
+		Topic:            fmt.Sprintf("%s/%s/%s", tenant, nameSpace, topic),
 		SubscriptionName: subscriptionName,
 		Type:             pulsar.Shared,
 	})
@@ -52,7 +65,7 @@ func main() {
 		log.Fatalf("could not create topic subscription: %v", err)
 	}
 	defer consumer.Close()
-	pulsarSource := apachepulsar.NewPulsarSource(client, consumer)
+	pulsarSource := apachepulsar.NewPulsarSource(client, pulsarAdminClient, consumer)
 	err = sourcer.NewServer(pulsarSource).Start(context.Background())
 	if err != nil {
 		log.Panic("failed to start source server : ", err)

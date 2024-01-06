@@ -18,27 +18,27 @@ package apachepulsar
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
 	"os"
 	"sync"
 
 	"github.com/apache/pulsar-client-go/pulsar"
 	sourcesdk "github.com/numaproj/numaflow-go/pkg/sourcer"
+	pulsaradmin "github.com/streamnative/pulsar-admin-go"
+	"github.com/streamnative/pulsar-admin-go/pkg/utils"
 )
 
 type PulsarSource struct {
-	client   pulsar.Client
-	consumer pulsar.Consumer
-	toAckSet map[string]pulsar.Message
-	lock     *sync.Mutex
+	client      pulsar.Client
+	adminClient pulsaradmin.Client
+	consumer    pulsar.Consumer
+	toAckSet    map[string]pulsar.Message
+	lock        *sync.Mutex
 }
 
-func NewPulsarSource(client pulsar.Client, consumer pulsar.Consumer) *PulsarSource {
-	return &PulsarSource{client: client, consumer: consumer, toAckSet: map[string]pulsar.Message{}, lock: new(sync.Mutex)}
+func NewPulsarSource(client pulsar.Client, adminClient pulsaradmin.Client, consumer pulsar.Consumer) *PulsarSource {
+	return &PulsarSource{client: client, adminClient: adminClient, consumer: consumer, toAckSet: map[string]pulsar.Message{}, lock: new(sync.Mutex)}
 }
 
 func (ps *PulsarSource) Read(_ context.Context, readRequest sourcesdk.ReadRequest, messageCh chan<- sourcesdk.Message) {
@@ -70,7 +70,14 @@ func (ps *PulsarSource) Read(_ context.Context, readRequest sourcesdk.ReadReques
 }
 
 func (ps *PulsarSource) Pending(_ context.Context) int64 {
-	return int64(len(ps.toAckSet))
+	topic, _ := utils.GetTopicName(fmt.Sprintf("%s/%s/%s", os.Getenv("PULSAR_TENANT"), os.Getenv("PULSAR_NAMESPACE"), os.Getenv("PULSAR_TOPIC")))
+	stats, err := ps.adminClient.Topics().GetStats(*topic)
+	if err != nil {
+		log.Printf("error getting pending count %s", err)
+		return 0
+	}
+	pendingMessages := stats.Subscriptions[os.Getenv("PULSAR_SUBSCRIPTION")].UnAckedMessages
+	return pendingMessages
 }
 
 func (ps *PulsarSource) Ack(ctx context.Context, request sourcesdk.AckRequest) {
@@ -79,39 +86,31 @@ func (ps *PulsarSource) Ack(ctx context.Context, request sourcesdk.AckRequest) {
 		case <-ctx.Done():
 			return
 		default:
-			ps.lock.Lock()
-			message := ps.toAckSet[string(offset.Value())]
-			err := ps.consumer.Ack(message)
-			if err != nil {
-				log.Printf("error in acknowledging message %s", err)
-				ps.lock.Unlock()
-				// continue here as we won't delete message from ackSet
-				continue
-			}
-			delete(ps.toAckSet, string(offset.Value()))
-			ps.lock.Unlock()
+			func() {
+				ps.lock.Lock()
+				defer ps.lock.Unlock()
+				message := ps.toAckSet[string(offset.Value())]
+				err := ps.consumer.Ack(message)
+				if err != nil {
+					log.Printf("error in acknowledging message %s", err)
+					return
+				}
+				delete(ps.toAckSet, string(offset.Value()))
+			}()
 		}
 	}
 }
 
 func (ps *PulsarSource) Partitions(ctx context.Context) []int32 {
-	restApiEndpoint := fmt.Sprintf("%s/admin/v2/persistent/public/default/%s/partitions", os.Getenv("PULSAR_ADMIN_ENDPOINT"), os.Getenv("PULSAR_TOPIC"))
-	resp, err := http.Get(restApiEndpoint)
+	topic, err := utils.GetTopicName(fmt.Sprintf("%s/%s/%s", os.Getenv("PULSAR_TENANT"), os.Getenv("PULSAR_NAMESPACE"), os.Getenv("PULSAR_TOPIC")))
 	if err != nil {
 		log.Printf("error getting partitions from admin endpoint %s", err)
 		return sourcesdk.DefaultPartitions()
 	}
-	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	stats, err := ps.adminClient.Topics().GetMetadata(*topic)
 	if err != nil {
-		log.Printf("error parsing data  from admin endpoint %s", err)
+		log.Printf("error getting partitions from admin endpoint %s", err)
 		return sourcesdk.DefaultPartitions()
 	}
-	var partitions map[string]interface{}
-	if err := json.Unmarshal(body, &partitions); err != nil {
-		log.Printf("error unmarshalling data  from admin endpoint %s", err)
-		return sourcesdk.DefaultPartitions()
-	}
-	partition := partitions["partitions"].(float64)
-	return []int32{int32(partition)}
+	return []int32{int32(stats.Partitions)}
 }

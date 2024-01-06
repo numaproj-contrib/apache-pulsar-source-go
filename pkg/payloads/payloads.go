@@ -14,7 +14,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-package mocks
+package payloads
 
 import (
 	"time"
@@ -41,4 +41,11 @@ type TestAckRequest struct {
 
 func (ar TestAckRequest) Offsets() []sourcer.Offset {
 	return ar.OffsetsValue
+}
+
+type PulsarStatus struct {
+	Subscriptions map[string]Subscription `json:"subscriptions"`
+}
+type Subscription struct {
+	UnAcknowledgedMessages int64 `json:"unackedMessages"`
 }

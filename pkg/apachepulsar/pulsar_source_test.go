@@ -21,6 +21,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"os/exec"
 	"testing"
 	"time"
 
@@ -28,24 +29,34 @@ import (
 	"github.com/numaproj/numaflow-go/pkg/sourcer"
 	"github.com/ory/dockertest/v3"
 	"github.com/ory/dockertest/v3/docker"
+	pulsaradmin "github.com/streamnative/pulsar-admin-go"
+	"github.com/streamnative/pulsar-admin-go/pkg/utils"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/numaproj-contrib/apache-pulsar-source-go/pkg/mocks"
+	"github.com/numaproj-contrib/apache-pulsar-source-go/pkg/payloads"
 )
 
 var (
 	pulsarClient pulsar.Client
+	pulsarAdmin  pulsaradmin.Client
 	resource     *dockertest.Resource
 	pool         *dockertest.Pool
 )
 
 const (
-	host             = "pulsar://localhost:6650"
-	topic            = "testTopic"
-	subscriptionName = "testSubscription"
+	host                = "pulsar://localhost:6650"
+	topic               = "testTopic"
+	pendingTopic        = "testPendingTopic" // specifically for testing pending messages
+	subscriptionName    = "testSubscription"
+	pulsarAdminEndPoint = "http://localhost:8080"
+	tenant              = "public"
+	namespace           = "test-namespace"
+	confDir             = "pulsarConf"
+	dataDir             = "pulsarDatDir"
+	partitions          = 2
 )
 
-func initProducer(client pulsar.Client) (pulsar.Producer, error) {
+func initProducer(client pulsar.Client, topic string) (pulsar.Producer, error) {
 	producer, err := client.CreateProducer(pulsar.ProducerOptions{
 		Topic: topic,
 	})
@@ -53,6 +64,16 @@ func initProducer(client pulsar.Client) (pulsar.Producer, error) {
 		return nil, err
 	}
 	return producer, err
+}
+
+func createTopic(tenant, namespace, topic string, partitions int) error {
+	topicPulsar, _ := utils.GetTopicName(fmt.Sprintf("%s/%s/%s", tenant, namespace, topic))
+	err := pulsarAdmin.Topics().Create(*topicPulsar, partitions)
+	if err != nil {
+		log.Printf("error creating topic %s", err)
+		return err
+	}
+	return nil
 }
 
 func sendMessage(producer pulsar.Producer, ctx context.Context) {
@@ -71,7 +92,34 @@ func sendMessage(producer pulsar.Producer, ctx context.Context) {
 	}
 }
 
+func sendCountedMessage(producer pulsar.Producer, ctx context.Context, count int) {
+	for i := 0; i < count; i++ {
+		_, err := producer.Send(ctx, &pulsar.ProducerMessage{
+			Payload: []byte("hello"),
+		})
+		if err != nil {
+			log.Println("Failed to publish message", err)
+		}
+		// delay confirming message reaches to consumer
+		time.Sleep(1 * time.Second)
+	}
+}
+
+func removeDockerVolume(volumeName string) {
+	cmd := exec.Command("docker", "volume", "rm", volumeName)
+	if err := cmd.Run(); err != nil {
+		log.Printf("Failed to remove Docker volume %s: %s", volumeName, err)
+	}
+}
+func setEnv() {
+	os.Setenv("PULSAR_ADMIN_ENDPOINT", pulsarAdminEndPoint)
+	os.Setenv("PULSAR_TENANT", tenant)
+	os.Setenv("PULSAR_NAMESPACE", namespace)
+	os.Setenv("PULSAR_SUBSCRIPTION", subscriptionName)
+}
+
 func TestMain(m *testing.M) {
+
 	var err error
 	p, err := dockertest.NewPool("")
 	if err != nil {
@@ -90,7 +138,7 @@ func TestMain(m *testing.M) {
 				{HostIP: "127.0.0.1", HostPort: "8080"},
 			},
 		},
-		Mounts: []string{"pulsardata:/pulsar/data", "pulsarconf:/pulsar/conf"},
+		Mounts: []string{fmt.Sprintf("%s:/pulsar/data", dataDir), fmt.Sprintf("%s:/pulsar/conf", confDir)},
 		Cmd:    []string{"bin/pulsar", "standalone"},
 	}
 	resource, err = pool.RunWithOptions(&opts)
@@ -111,6 +159,14 @@ func TestMain(m *testing.M) {
 		if err != nil {
 			log.Fatalf("failed to create pulsar client: %v", err)
 		}
+		cfg := &pulsaradmin.Config{
+			WebServiceURL: pulsarAdminEndPoint,
+		}
+		pulsarAdmin, err = pulsaradmin.NewClient(cfg)
+		if err != nil {
+			log.Fatalf("failed to create pulsar admin client: %v", err)
+		}
+
 		return nil
 	}); err != nil {
 		if resource != nil {
@@ -118,27 +174,50 @@ func TestMain(m *testing.M) {
 		}
 		log.Fatalf("could not connect to apache pulsar %s", err)
 	}
-	defer pulsarClient.Close()
+	// waiting for pulsar admin to be ready
+	time.Sleep(10 * time.Second)
+	// Create a new namespace
+	err = pulsarAdmin.Namespaces().CreateNamespace(fmt.Sprintf("%s/%s", tenant, namespace))
+	if err != nil {
+		log.Fatalf("failed to create pulsar namespace: %v", err)
+
+	}
+	err = createTopic(tenant, namespace, topic, partitions)
+	if err != nil {
+		log.Fatalf("failed to create pulsar topic %s: %v", topic, err)
+	}
+
+	// creating topic for checking pending messages
+	err = createTopic(tenant, namespace, pendingTopic, 0)
+	if err != nil {
+		log.Fatalf("failed to create pulsar topic %s: %v", pendingTopic, err)
+	}
+
+	setEnv()
 	code := m.Run()
+	defer pulsarClient.Close()
 	if resource != nil {
 		if err := pool.Purge(resource); err != nil {
 			log.Fatalf("Couln't purge resource %s", err)
 		}
 	}
+	// removing persistent docker volumes
+	removeDockerVolume(dataDir)
+	removeDockerVolume(confDir)
 	os.Exit(code)
 }
 
 func TestPulsarSource_Read(t *testing.T) {
+	os.Setenv("PULSAR_TOPIC", topic)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	log.Println("pulsar client", pulsarClient)
-	producer, err := initProducer(pulsarClient)
+	producer, err := initProducer(pulsarClient, fmt.Sprintf("%s/%s/%s", tenant, namespace, topic))
 	assert.Nil(t, err)
 	defer producer.Close()
 	go sendMessage(producer, ctx)
 	messageCh := make(chan sourcer.Message, 20)
 	consumer, err := pulsarClient.Subscribe(pulsar.ConsumerOptions{
-		Topic:            topic,
+		Topic:            fmt.Sprintf("%s/%s/%s", tenant, namespace, topic),
 		SubscriptionName: subscriptionName,
 		Type:             pulsar.Shared,
 	})
@@ -146,8 +225,8 @@ func TestPulsarSource_Read(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer consumer.Close()
-	pulsarSource := NewPulsarSource(pulsarClient, consumer)
-	pulsarSource.Read(ctx, mocks.ReadRequest{
+	pulsarSource := NewPulsarSource(pulsarClient, pulsarAdmin, consumer)
+	pulsarSource.Read(ctx, payloads.ReadRequest{
 		CountValue: 5,
 		Timeout:    20 * time.Second,
 	}, messageCh)
@@ -155,8 +234,7 @@ func TestPulsarSource_Read(t *testing.T) {
 	// Try reading 4 more messages
 	// Since the previous batch didn't get acked, the data source shouldn't allow us to read more messages
 	// We should get 0 messages, meaning the channel only holds the previous 5 messages
-
-	pulsarSource.Read(ctx, mocks.ReadRequest{
+	pulsarSource.Read(ctx, payloads.ReadRequest{
 		CountValue: 4,
 		Timeout:    time.Second,
 	}, messageCh)
@@ -167,27 +245,33 @@ func TestPulsarSource_Read(t *testing.T) {
 	msg3 := <-messageCh
 	msg4 := <-messageCh
 	msg5 := <-messageCh
-	fmt.Println(msg1.Offset().Value(), msg2.Offset().Value(), msg3.Offset().Value(), msg4.Offset().Value(), msg5.Offset().Value())
-
-	pulsarSource.Ack(ctx, mocks.TestAckRequest{
+	pulsarSource.Ack(ctx, payloads.TestAckRequest{
 		OffsetsValue: []sourcer.Offset{msg1.Offset(), msg2.Offset(), msg3.Offset(), msg4.Offset(), msg5.Offset()},
 	})
 
 	// Read 6 more messages
-	pulsarSource.Read(ctx, mocks.ReadRequest{
+	pulsarSource.Read(ctx, payloads.ReadRequest{
 		CountValue: 6,
 		Timeout:    time.Second,
 	}, messageCh)
 	assert.Equal(t, 6, len(messageCh))
+	msg6 := <-messageCh
+	msg7 := <-messageCh
+	msg8 := <-messageCh
+	msg9 := <-messageCh
+	msg10 := <-messageCh
+	msg11 := <-messageCh
+	pulsarSource.Ack(ctx, payloads.TestAckRequest{
+		OffsetsValue: []sourcer.Offset{msg6.Offset(), msg7.Offset(), msg8.Offset(), msg9.Offset(), msg10.Offset(), msg11.Offset()},
+	})
 }
 
 func TestPulsarSource_Partitions(t *testing.T) {
-	os.Setenv("PULSAR_ADMIN_ENDPOINT", "http://localhost:8080")
 	os.Setenv("PULSAR_TOPIC", topic)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	consumer, err := pulsarClient.Subscribe(pulsar.ConsumerOptions{
-		Topic:            topic,
+		Topic:            fmt.Sprintf("%s/%s/%s", tenant, namespace, topic),
 		SubscriptionName: subscriptionName,
 		Type:             pulsar.Shared,
 	})
@@ -195,21 +279,21 @@ func TestPulsarSource_Partitions(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer consumer.Close()
-	pulsarSource := NewPulsarSource(pulsarClient, consumer)
-	partitions := pulsarSource.Partitions(ctx)
-	assert.GreaterOrEqual(t, 1, len(partitions))
+	pulsarSource := NewPulsarSource(pulsarClient, pulsarAdmin, consumer)
+	partitionsCount := pulsarSource.Partitions(ctx)
+	assert.Equal(t, partitions, int(partitionsCount[0]))
 }
 
 func TestPulsarSource_Pending(t *testing.T) {
+	os.Setenv("PULSAR_TOPIC", pendingTopic)
+	messagesCount := 20
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	producer, err := initProducer(pulsarClient)
+	producer, err := initProducer(pulsarClient, fmt.Sprintf("%s/%s/%s", tenant, namespace, pendingTopic))
 	assert.Nil(t, err)
 	defer producer.Close()
-	go sendMessage(producer, ctx)
-	messageCh := make(chan sourcer.Message, 20)
 	consumer, err := pulsarClient.Subscribe(pulsar.ConsumerOptions{
-		Topic:            topic,
+		Topic:            fmt.Sprintf("%s/%s/%s", tenant, namespace, pendingTopic),
 		SubscriptionName: subscriptionName,
 		Type:             pulsar.Shared,
 	})
@@ -217,13 +301,8 @@ func TestPulsarSource_Pending(t *testing.T) {
 		log.Fatal(err)
 	}
 	defer consumer.Close()
-	pulsarSource := NewPulsarSource(pulsarClient, consumer)
-	// Reading 4 messages
-	pulsarSource.Read(ctx, mocks.ReadRequest{
-		CountValue: 4,
-		Timeout:    time.Second,
-	}, messageCh)
-	// pending should return 4 as there are 4 messages to be acknowledged
+	sendCountedMessage(producer, ctx, messagesCount)
+	pulsarSource := NewPulsarSource(pulsarClient, pulsarAdmin, consumer)
 	pending := pulsarSource.Pending(ctx)
-	assert.Equal(t, int64(4), pending)
+	assert.Equal(t, int64(messagesCount), pending)
 }

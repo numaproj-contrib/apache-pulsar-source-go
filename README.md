@@ -43,14 +43,12 @@ spec:
                 value: "pulsar-broker.numaflow-system.svc.cluster.local:6650"
               - name: PULSAR_ADMIN_ENDPOINT
                 value: "http://pulsar-broker.numaflow-system.svc.cluster.local:8080"
-    - name: redis-sink
+    - name: log-sink
       sink:
-        udsink:
-          container:
-            image: "quay.io/numaio/numaflow-sink/redis-e2e-test-sink:v0.5.0"
+        log: {}
   edges:
     - from: in
-      to: redis-sink
+      to: log-sink
 ```
 
 Replace `test-topic`, `test-subscription`, and the Pulsar host details with your specific Apache Pulsar configuration.
@@ -75,6 +73,3 @@ kubectl delete -f pulsar-source-pipeline.yaml
 
 - For detailed guidance on Numaflow, visit the [Numaflow Documentation](https://numaflow.numaproj.io/).
 - To learn more about Apache Pulsar and its configuration, refer to the [Apache Pulsar Documentation](https://pulsar.apache.org/docs/en/).
-- For Redis sink configuration, see the [Numaflow Redis Sink Documentation](https://numaflow.numaproj.io/sinks/redis/).
-
-This README provides a guide on setting up an Apache Pulsar source within a Numaflow pipeline, detailing prerequisites, a step-by-step setup guide, and additional resources. Remember to replace placeholders like `test-topic`, `test-subscription`, and Pulsar host details with actual values from your Apache Pulsar setup.

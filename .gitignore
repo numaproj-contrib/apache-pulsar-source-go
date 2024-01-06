@@ -26,6 +26,3 @@ go.work
 .DS_Store
 ./.DS_Store
 /.DS_Store
-/pkg/pubsubsource/client.json
-pkg/pubsubsource/client.json
-./pkg/pubsubsource/client.json

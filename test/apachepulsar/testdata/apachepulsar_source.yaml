@@ -4,7 +4,7 @@ metadata:
   name: apache-pulsar-source
 spec:
   limits:
-    readBatchSize: 10 # for aws sqs the batch size should be between 1 -  10 - SQS Valid values: 1 to 10. Default: 1
+    readBatchSize: 10
   vertices:
     - name: in
       source:
@@ -16,6 +16,10 @@ spec:
                 value: "test-topic"
               - name: PULSAR_SUBSCRIPTION_NAME
                 value: "test-subscription"
+              - name: PULSAR_TENANT
+                value: "public"       #Default is public
+              - name: PULSAR_NAMESPACE
+                value: "test-namespace"
               - name: PULSAR_HOST
                 value: "pulsar-broker.numaflow-system.svc.cluster.local:6650"
               - name: PULSAR_ADMIN_ENDPOINT
