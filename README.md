@@ -67,6 +67,9 @@ Check the Numaflow pipeline's logs to ensure that it successfully connects to Ap
 To delete the Numaflow pipeline:
 ```bash
 kubectl delete -f pulsar-source-pipeline.yaml
+# Remove Docker volumes
+# Replace with your volume names
+docker volume rm pulsar-data-volume pulsar-config-volume
 ```
 
 ## Additional Resources
