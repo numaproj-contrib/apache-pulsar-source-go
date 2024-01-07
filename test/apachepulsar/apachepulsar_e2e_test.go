@@ -1,4 +1,4 @@
-////go:build test
+//go:build test
 
 /*
    Copyright 2022 The Numaproj Authors.
@@ -44,6 +44,30 @@ const (
 
 type ApachePulsarSuite struct {
 	fixtures.E2ESuite
+}
+
+func initClient() (pulsar.Client, error) {
+	pulsarClient, err := pulsar.NewClient(pulsar.ClientOptions{
+		URL:               host,
+		OperationTimeout:  30 * time.Second,
+		ConnectionTimeout: 30 * time.Second,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	return pulsarClient, nil
+}
+
+func initAdminClient() (pulsaradmin.Client, error) {
+	cfg := &pulsaradmin.Config{
+		WebServiceURL: pulsarAdminEndPoint,
+	}
+	pulsarAdmin, err := pulsaradmin.NewClient(cfg)
+	if err != nil {
+		return nil, err
+	}
+	return pulsarAdmin, err
 }
 
 func createTopic(pulsarAdmin pulsaradmin.Client, tenant, namespace, topic string, partitions int) error {
@@ -116,29 +140,6 @@ func (suite *ApachePulsarSuite) SetupTest() {
 
 }
 
-func initClient() (pulsar.Client, error) {
-	pulsarClient, err := pulsar.NewClient(pulsar.ClientOptions{
-		URL:               host,
-		OperationTimeout:  30 * time.Second,
-		ConnectionTimeout: 30 * time.Second,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return pulsarClient, nil
-}
-
-func initAdminClient() (pulsaradmin.Client, error) {
-	cfg := &pulsaradmin.Config{
-		WebServiceURL: pulsarAdminEndPoint,
-	}
-	pulsarAdmin, err := pulsaradmin.NewClient(cfg)
-	if err != nil {
-		return nil, err
-	}
-	return pulsarAdmin, err
-}
 func (suite *ApachePulsarSuite) TestApachePulsarSource() {
 	var testMessage = "testing"
 	ctx, cancel := context.WithCancel(context.Background())
