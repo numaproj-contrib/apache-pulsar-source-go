@@ -53,7 +53,7 @@ const (
 	namespace           = "test-namespace"
 	confDir             = "pulsarConf"
 	dataDir             = "pulsarDatDir"
-	partitions          = 2
+	numOfPartitions     = 2
 )
 
 func initProducer(client pulsar.Client, topic string) (pulsar.Producer, error) {
@@ -182,7 +182,7 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to create pulsar namespace: %v", err)
 
 	}
-	err = createTopic(tenant, namespace, topic, partitions)
+	err = createTopic(tenant, namespace, topic, numOfPartitions)
 	if err != nil {
 		log.Fatalf("failed to create pulsar topic %s: %v", topic, err)
 	}
@@ -280,9 +280,9 @@ func TestPulsarSource_Partitions(t *testing.T) {
 	}
 	defer consumer.Close()
 	pulsarSource := NewPulsarSource(pulsarClient, pulsarAdmin, consumer)
-	partitionsCount := pulsarSource.Partitions(ctx)
-	assert.Equal(t, partitions, len(partitionsCount))
-	for i, v := range partitionsCount {
+	partitionIndices := pulsarSource.Partitions(ctx)
+	assert.Equal(t, numOfPartitions, len(partitionIndices))
+	for i, v := range partitionIndices {
 		assert.Equal(t, i, int(v))
 	}
 }

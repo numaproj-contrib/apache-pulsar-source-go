@@ -17,7 +17,7 @@ spec:
               - name: PULSAR_SUBSCRIPTION_NAME
                 value: "test-subscription"
               - name: PULSAR_TENANT
-                value: "public"       #Default is public
+                value: "public"   
               - name: PULSAR_NAMESPACE
                 value: "test-namespace"
               - name: PULSAR_HOST
