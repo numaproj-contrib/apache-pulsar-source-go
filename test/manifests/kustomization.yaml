@@ -1,0 +1,6 @@
+# moto.yaml is used in E2E testing to create a mocks of AWS APIs.
+resources:
+  - e2e-api-pod.yaml
+
+commonLabels:
+  "numaflow-e2e": "true"

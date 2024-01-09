@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: pulsar-broker
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pulsar-broker
+  template:
+    metadata:
+      labels:
+        app: pulsar-broker
+      name:  pulsar-broker
+    spec:
+      containers:
+        - name: pulsar
+          image: apachepulsar/pulsar:latest
+          ports:
+            - containerPort: 6650
+            - containerPort: 8080
+          env:
+            - name: PULSAR_MEM
+              value: "-Xms1g -Xmx1g -XX:MaxDirectMemorySize=1g"
+          command: ["bin/pulsar"]
+          args: ["standalone"]
+          livenessProbe:
+            failureThreshold: 5
+            httpGet:
+              path: /admin/v2/brokers/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 10
+          readinessProbe:
+            failureThreshold: 5
+            httpGet:
+                path: /admin/v2/brokers/health
+                port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            timeoutSeconds: 10
+  serviceName: pulsar-broker-service
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pulsar-broker
+spec:
+  selector:
+    app: pulsar-broker
+  ports:
+    - name: pulsar
+      protocol: TCP
+      port: 6650
+      targetPort: 6650
+    - name: http
+      protocol: TCP
+      port: 8080
+      targetPort: 8080
