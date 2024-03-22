@@ -31,6 +31,7 @@ import (
 )
 
 func main() {
+	fmt.Println("HELLO PEOPLE> I HAVE TAKEN CONTROL HAHAHA")
 	topic := os.Getenv("PULSAR_TOPIC")
 	subscriptionName := os.Getenv("PULSAR_SUBSCRIPTION_NAME")
 	host := os.Getenv("PULSAR_HOST")
