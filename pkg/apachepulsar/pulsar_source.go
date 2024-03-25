@@ -54,22 +54,21 @@ func (ps *PulsarSource) Read(_ context.Context, readRequest sourcesdk.ReadReques
 			return
 		default:
 			ps.lock.Lock()
-			defer ps.lock.Unlock()
 			msg, err := ps.consumer.Receive(ctx)
 			if msg == nil {
 				log.Println("received empty message")
-				continue
-			}
-			if err != nil {
+			} else if err != nil {
 				log.Printf("error receiving message %s", err)
-				continue
+			} else {
+				log.Println("got message!")
+				messageCh <- sourcesdk.NewMessage(
+					msg.Payload(),
+					sourcesdk.NewOffset([]byte(msg.ID().String()), 0),
+					msg.PublishTime(),
+				)
+				ps.toAckSet[msg.ID().String()] = msg
 			}
-			messageCh <- sourcesdk.NewMessage(
-				msg.Payload(),
-				sourcesdk.NewOffset([]byte(msg.ID().String()), 0),
-				msg.PublishTime(),
-			)
-			ps.toAckSet[msg.ID().String()] = msg
+			ps.lock.Unlock()
 		}
 	}
 }
