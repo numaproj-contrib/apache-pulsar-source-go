@@ -70,7 +70,6 @@ func (ps *PulsarSource) Read(_ context.Context, readRequest sourcesdk.ReadReques
 				msg.PublishTime(),
 			)
 			ps.toAckSet[msg.ID().String()] = msg
-			ps.lock.Unlock()
 		}
 	}
 }
