@@ -60,7 +60,6 @@ func (ps *PulsarSource) Read(_ context.Context, readRequest sourcesdk.ReadReques
 			} else if err != nil {
 				log.Printf("error receiving message %s", err)
 			} else {
-				log.Println("got message!")
 				messageCh <- sourcesdk.NewMessage(
 					msg.Payload(),
 					sourcesdk.NewOffset([]byte(msg.ID().String()), 0),
